@@ -6,23 +6,20 @@ import ImportLog from "../models/ImportLog.js";
 console.log("👷 Job worker started");
 
 const worker = new Worker(
-  "jobQueue", // ✅ MUST match queue name
+  "jobQueue",
   async ({ data }) => {
     const { job, importLogId } = data;
 
     try {
       console.log("👷 Processing job:", job.title?.[0]);
 
-      // 1️⃣ Extract unique job identifier
       const jobId = job.guid?.[0]?._ || job.link?.[0];
       if (!jobId) {
         throw new Error("Job ID not found");
       }
 
-      // 2️⃣ Check if job already exists
       const existing = await Job.findOne({ jobId });
 
-      // 3️⃣ Upsert job
       await Job.updateOne(
         { jobId },
         {
@@ -37,33 +34,52 @@ const worker = new Worker(
         { upsert: true }
       );
 
-      // 4️⃣ Update batch counters atomically
+      // 🔢 Update counters
       await ImportLog.findByIdAndUpdate(importLogId, {
         $inc: existing ? { updatedJobs: 1 } : { newJobs: 1 },
       });
 
-      // 5️⃣ FINALIZE batch if all jobs are processed
       const log = await ImportLog.findById(importLogId);
 
+      // 🔥 REAL-TIME PROGRESS UPDATE
+      if (global.io && log) {
+        global.io.emit("import-progress", {
+          importLogId,
+          newJobs: log.newJobs,
+          updatedJobs: log.updatedJobs,
+          failed: log.failedJobs.length,
+          totalFetched: log.totalFetched,
+        });
+      }
+
+      // ✅ Finalize batch
       if (
         log &&
         log.totalFetched ===
           log.newJobs + log.updatedJobs + log.failedJobs.length
       ) {
-        await ImportLog.findByIdAndUpdate(importLogId, {
-          status: log.failedJobs.length > 0 ? "partial" : "success",
-          message: "Job import completed",
-          totalImported: log.newJobs + log.updatedJobs,
-        });
+        const finalLog = await ImportLog.findByIdAndUpdate(
+          importLogId,
+          {
+            status: log.failedJobs.length > 0 ? "partial" : "success",
+            message: "Job import completed",
+            totalImported: log.newJobs + log.updatedJobs,
+          },
+          { new: true }
+        );
 
         console.log("✅ Import batch completed:", importLogId);
+
+        // 🔥 FINAL REAL-TIME UPDATE
+        if (global.io) {
+          global.io.emit("import-log-update", finalLog);
+        }
       }
 
       return existing ? "updated" : "created";
     } catch (err) {
       console.error("❌ Worker error:", err.message);
 
-      // 6️⃣ Track failed job in SAME batch
       await ImportLog.findByIdAndUpdate(importLogId, {
         $push: {
           failedJobs: {
@@ -72,7 +88,14 @@ const worker = new Worker(
         },
       });
 
-      // 7️⃣ Retry support (BullMQ)
+      // 🔥 REAL-TIME FAILURE UPDATE
+      if (global.io) {
+        global.io.emit("import-error", {
+          importLogId,
+          error: err.message,
+        });
+      }
+
       throw err;
     }
   },
@@ -85,7 +108,6 @@ const worker = new Worker(
   }
 );
 
-// Optional logs (nice for debugging)
 worker.on("completed", (job) => {
   console.log(`✅ Job ${job.id} completed`);
 });
