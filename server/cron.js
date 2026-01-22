@@ -6,7 +6,7 @@ import ImportLog from "./models/ImportLog.js";
 
 console.log("🔄 cron.js is loading...");
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 * * * *", async () => {
   try {
     console.log("⏰ Cron triggered");
 
