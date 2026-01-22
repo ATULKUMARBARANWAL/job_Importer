@@ -1,29 +1,29 @@
 # Job Importer using Redis & BullMQ
 
-A backend system for importing jobs from an external XML feed, processing them asynchronously with Redis and BullMQ, and storing results in MongoDB.
+A backend system for importing jobs from an external XML feed, processing them asynchronously with Redis and BullMQ, and storing results in MongoDB.  
 It includes an admin dashboard that shows import history and real-time updates.
 
 ---
 
 ## 🚀 Overview
 
-This project fetches job data from an external XML feed on a schedule or via manual trigger.
-Jobs are processed in the background using BullMQ workers and stored safely in MongoDB using upsert logic.
+This project fetches job data from an external XML feed on a schedule or via manual trigger.  
+Jobs are processed in the background using BullMQ workers and stored safely in MongoDB using upsert logic.  
 Each import run is tracked as a batch and can be monitored from an admin UI in real time.
 
 ---
 
 ## ✨ Features
 
-- Cron-based job fetching
-- External XML job feed integration
-- Background processing using BullMQ
-- Concurrent job workers
-- MongoDB storage with upsert logic
-- Batch-level import history
-- Admin dashboard for monitoring
-- Real-time updates using Socket.IO
-- Retry-safe and fault-tolerant design
+- Cron-based job fetching  
+- External XML job feed integration  
+- Background processing using BullMQ  
+- Concurrent job workers  
+- MongoDB storage with upsert logic  
+- Batch-level import history  
+- Admin dashboard for monitoring  
+- Real-time updates using Socket.IO  
+- Retry-safe and fault-tolerant design  
 
 ---
 
@@ -66,27 +66,43 @@ Admin Dashboard (Real-Time)
 
 ## ▶️ Running the Project
 
-### Start Redis
+### 🐳 Redis Setup (Windows)
+
+Redis does not run natively on Windows.  
+For this project, Redis is run using Docker only.
+
+Start Redis using Docker:
+
 ```bash
-redis-server
+docker run -d --name redis-bullmq -p 6379:6379 redis:7
 ```
 
-### Install dependencies and start backend
+Ensure your environment variables are set correctly:
+
+```
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+> No docker-compose file is used in this project.
+
+---
+
+### Start Backend Server
+
 ```bash
 cd server
 npm install
 npx nodemon index.js
 ```
 
+---
+
 ### Start Admin UI
+
 ```bash
 cd client
 npm install
 npm run dev
 ```
 
----
-
-## 📄 License
-
-MIT
